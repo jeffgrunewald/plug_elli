@@ -14,7 +14,8 @@ defmodule PlugElli.MixProject do
       package: package(),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      docs: docs()
+      docs: docs(),
+      elixirc_paths: Mix.env() |> elixirc_paths()
     ]
   end
 
@@ -27,8 +28,10 @@ defmodule PlugElli.MixProject do
 
   defp deps do
     [
-      {:plug, "~> 1.10"},
-      {:elli, "~> 3.3"}
+      {:plug, "~> 1.11"},
+      {:elli, "~> 3.3"},
+      {:hackney, "~> 1.17", only: :test},
+      {:jason, "~> 1.2", only: :test}
     ]
   end
 
@@ -47,4 +50,7 @@ defmodule PlugElli.MixProject do
       source_url: "https://github.com/jeffgrunewald/plug_elli"
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 end

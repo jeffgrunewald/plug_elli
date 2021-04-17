@@ -1,13 +1,13 @@
 defmodule Plug.Elli.Conn do
   @moduledoc false
 
-  require Logger
-
   @behaviour Plug.Conn.Adapter
 
-  import Record, only: [defrecordp: 2, extract: 2]
+  require Logger
 
-  defrecordp :elli_req, extract(:req, from_lib: "elli/include/elli.hrl")
+  import Plug.Elli.Request, only: [elli_req: 1]
+
+  alias Plug.Elli.{Request, Stream}
 
   def conn(
     elli_req(
@@ -15,42 +15,45 @@ defmodule Plug.Elli.Conn do
       raw_path: raw_path,
       headers: headers,
       method: method,
-      body: body,
       scheme: scheme,
       host: host,
-      port: port,
-      socket: socket
+      port: port
     ) = req
   ) do
-    {peer_ip, _} = peer_ip_and_port(socket)
-
-    [request_path, query_string] = :binary.split(raw_path, [<<"?">>])
-
     %Plug.Conn{
-      adapter: {__MODULE__, req},
+      adapter: {__MODULE__, %Request{req: req, stream_process: nil}},
       host: host,
-      method: method |> to_string(),
+      method: to_string(method),
       owner: self(),
       path_info: path,
       port: port,
-      remote_ip: peer_ip,
-      query_string: query_string,
-      req_headers: headers,
-      request_path: request_path,
-      scheme: scheme |> String.to_existing_atom()
+      remote_ip: :elli_request.peer(req),
+      query_string: :elli_request.query_str(req),
+      req_headers: downcase_headers(headers),
+      request_path: request_path(raw_path),
+      scheme: scheme
     }
   end
 
   @impl true
-  def send_resp(req, _status, _headers, _body) do
-    {:ok, nil, req}
+  def send_resp(%Request{req: req} = request, status, headers, body) do
+    headers = [
+      Request.connection(req, headers),
+      {"content-length", to_string(byte_size(body))}
+      | headers
+    ]
+
+    :ok = :elli_http.send_response(req, status, headers, body)
+
+    {:ok, nil, request}
   end
 
   @impl true
+  # FINISH
   def send_file(
-    elli_req(socket: socket) = req,
-    status,
-    headers,
+    elli_req(socket: socket),
+    _status,
+    _headers,
     path,
     offset,
     length
@@ -70,18 +73,22 @@ defmodule Plug.Elli.Conn do
   end
 
   @impl true
-  def send_chunked(req, _status, _headers) do
-    {:ok, nil, req}
+  def send_chunked(%Request{req: req} = request, status, headers) do
+    pid = spawn_link(Stream, :init, [req, status, headers])
+
+    {:ok, nil, %{request | stream_process: pid}}
   end
 
   @impl true
-  def chunk(req, _body) do
+  def chunk(%Request{stream_process: pid}, body) do
+    :elli_request.send_chunk(pid, body)
+
     :ok
   end
 
   @impl true
-  def read_req_body(elli_req(body: body) = req, _opts) do
-    {:ok, IO.iodata_to_binary(body), req}
+  def read_req_body(%Request{req: elli_req(body: body)} = request, _opts) do
+    {:ok, IO.iodata_to_binary(body), request}
   end
 
   @impl true
@@ -97,13 +104,13 @@ defmodule Plug.Elli.Conn do
   end
 
   @impl true
-  def get_peer_data(elli_req(socket: socket)) do
+  def get_peer_data(%Request{req: elli_req(socket: socket)}) do
     {ip, port} = peer_ip_and_port(socket)
 
     %{
       address: ip,
       port: port,
-      ssl_cert: nil
+      ssl_cert: peercert(socket)
     }
   end
 
@@ -111,12 +118,32 @@ defmodule Plug.Elli.Conn do
   def get_http_protocol(elli_req(version: {0, 9})), do: :"HTTP/0.9"
   def get_http_protocol(elli_req(version: {1, 0})), do: :"HTTP/1"
   def get_http_protocol(elli_req(version: {1, 1})), do: :"HTTP/1.1"
-  def get_http_protocol(elli_req(version: {2, 0})), do: :"HTTP/2"
+
+  defp downcase_headers(headers) do
+    Enum.map(headers, fn {key, value} ->
+      {String.downcase(key), value}
+    end)
+  end
 
   defp peer_ip_and_port(socket) do
     case :elli_tcp.peername(socket) do
-      {:ok, {address, port} = peer} -> peer
+      {:ok, {_address, _port} = peer} -> peer
       {:error, _} -> {:undefined, :undefined}
+    end
+  end
+
+  defp peercert({:plain, _socket}), do: nil
+  defp peercert({:ssl, socket}) do
+    case :ssl.peercert(socket) do
+      {:ok, cert} -> cert
+      {:error, _} -> nil
+    end
+  end
+
+  defp request_path(raw_path) do
+    case :binary.split(raw_path, [<<"?">>]) do
+      [path, _query] -> path
+      [path] -> path
     end
   end
 end

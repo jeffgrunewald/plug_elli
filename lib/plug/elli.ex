@@ -3,6 +3,10 @@ defmodule Plug.Elli do
   Adapter interface for the Elli webserver.
   """
 
+  def start(_type, _args) do
+    Supervisor.start_link([], strategy: :one_for_one)
+  end
+
   def http(plug, opts, elli_options \\ []) do
     run(:http, plug, opts, elli_options)
   end
@@ -15,12 +19,12 @@ defmodule Plug.Elli do
   def shutdown(ref), do: :elli.stop(ref)
 
   def child_spec(opts) do
-    scheme = Keyword.fetch!(opts, :scheme)
+    scheme = Keyword.get(opts, :scheme, :http)
 
     {plug, plug_opts} =
       case Keyword.fetch!(opts, :plug) do
-        {_, _} = tuple -> tuple
-        plug -> {plug, []}
+        {plug, plug_opts} -> {plug, plug.init(plug_opts)}
+        plug -> {plug, plug.init([])}
       end
 
     {id, opts} = Keyword.pop(opts, :id)
