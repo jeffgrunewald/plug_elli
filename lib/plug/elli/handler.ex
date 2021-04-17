@@ -24,7 +24,8 @@ defmodule Plug.Elli.Handler do
     :ok
   end
 
-  defp maybe_close_stream(%Plug.Conn{adapter: {_, %Request{stream_process: pid}}} = conn) when is_pid(pid) do
+  defp maybe_close_stream(%Plug.Conn{adapter: {_, %Request{stream_process: pid}}} = conn)
+       when is_pid(pid) do
     :elli_request.close_chunk(pid)
 
     conn

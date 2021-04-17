@@ -7,9 +7,9 @@ defmodule Plug.Elli.Request do
   defrecord :elli_req, :req, extract(:req, from_lib: "elli/include/elli.hrl")
 
   @type t :: %__MODULE__{
-    req: :elli.req(),
-    stream_process: pid()
-  }
+          req: :elli.req(),
+          stream_process: pid()
+        }
 
   defstruct [:req, :stream_process]
 
@@ -43,7 +43,9 @@ defmodule Plug.Elli.Request do
     case get_header(headers, @connection_header) do
       close when close in ["close", "Close"] ->
         "close"
-      _ -> "Keep-Alive"
+
+      _ ->
+        "Keep-Alive"
     end
   end
 

@@ -10,16 +10,16 @@ defmodule Plug.Elli.Conn do
   alias Plug.Elli.{Request, Stream}
 
   def conn(
-    elli_req(
-      path: path,
-      raw_path: raw_path,
-      headers: headers,
-      method: method,
-      scheme: scheme,
-      host: host,
-      port: port
-    ) = req
-  ) do
+        elli_req(
+          path: path,
+          raw_path: raw_path,
+          headers: headers,
+          method: method,
+          scheme: scheme,
+          host: host,
+          port: port
+        ) = req
+      ) do
     %Plug.Conn{
       adapter: {__MODULE__, %Request{req: req, stream_process: nil}},
       host: host,
@@ -51,18 +51,19 @@ defmodule Plug.Elli.Conn do
   @impl true
   # FINISH
   def send_file(
-    elli_req(socket: socket),
-    _status,
-    _headers,
-    path,
-    offset,
-    length
-  ) do
+        elli_req(socket: socket),
+        _status,
+        _headers,
+        path,
+        offset,
+        length
+      ) do
     length =
       cond do
         length == :all ->
           %File.Stat{type: :regular, size: size} = File.stat!(path)
           size
+
         is_integer(length) ->
           length
       end
@@ -133,6 +134,7 @@ defmodule Plug.Elli.Conn do
   end
 
   defp peercert({:plain, _socket}), do: nil
+
   defp peercert({:ssl, socket}) do
     case :ssl.peercert(socket) do
       {:ok, cert} -> cert

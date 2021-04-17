@@ -66,9 +66,9 @@ defmodule Plug.Elli do
     |> Keyword.put_new(:port, 8443)
     |> Plug.SSL.configure()
     |> case do
-         {:ok, options} -> options
-         {:error, message} -> fail(message)
-       end
+      {:ok, options} -> options
+      {:error, message} -> fail(message)
+    end
   end
 
   defp build_id(plug, scheme) do

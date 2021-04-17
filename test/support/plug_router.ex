@@ -22,7 +22,7 @@ defmodule Testing.Plug.Router do
     end)
   end
 
-  post "/created" do
+  post "/create" do
     name = conn.params["name"]
     send_resp(conn, 200, "created #{name}")
   end
